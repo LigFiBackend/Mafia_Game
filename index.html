@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎭 Мафия Online</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background: #1a1a2e;
+            color: white;
+            text-align: center;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: #16213e;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+        }
+        h1 {
+            color: #e94560;
+            font-size: 2.5em;
+            margin-bottom: 20px;
+        }
+        .input-section, .game-section, .role-section, .vote-section, .event-section {
+            margin-bottom: 20px;
+        }
+        input, button {
+            padding: 10px;
+            margin: 5px;
+            border: none;
+            border-radius: 5px;
+            font-size: 1em;
+        }
+        button {
+            background: #e94560;
+            color: white;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+        button:hover {
+            background: #ff6b81;
+            transform: scale(1.05);
+        }
+        #playersList, #deadPlayersList {
+            margin: 15px 0;
+            text-align: left;
+            padding-left: 20px;
+        }
+        .player, .dead-player {
+            margin: 5px 0;
+            padding: 8px;
+            border-radius: 5px;
+        }
+        .player {
+            background: #0f3460;
+        }
+        .dead-player {
+            background: #555;
+            text-decoration: line-through;
+            opacity: 0.7;
+        }
+        .role {
+            font-size: 1.5em;
+            font-weight: bold;
+            margin: 20px 0;
+            padding: 15px;
+            border-radius: 10px;
+            background: #0f3460;
+            animation: fadeIn 1s;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        .spinner {
+            font-size: 2em;
+            margin: 20px 0;
+        }
+        .hidden {
+            display: none;
+        }
+        .admin-panel {
+            background: #e94560;
+            padding: 10px;
+            border-radius: 10px;
+            margin-top: 15px;
+        }
+        .event-log {
+            background: #0f3460;
+            padding: 10px;
+            border-radius: 10px;
+            margin: 10px 0;
+            text-align: left;
+        }
+        .night-event, .day-event {
+            animation: slideIn 0.5s;
+            padding: 8px;
+            margin: 5px 0;
+            border-left: 3px solid #e94560;
+        }
+        .night-event {
+            border-color: #8a2be2;
+        }
+        @keyframes slideIn {
+            from { transform: translateX(-20px); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎭 Мафия Online</h1>
+        
+        <!-- Регистрация -->
+        <div class="input-section" id="registerSection">
+            <input type="text" id="playerName" placeholder="Твоё имя">
+            <button onclick="registerPlayer()">Войти в игру</button>
+        </div>
+
+        <!-- Список игроков -->
+        <div id="playersList"></div>
+
+        <!-- Список выбывших -->
+        <div id="deadPlayersSection" class="hidden">
+            <h3>💀 Выбывшие:</h3>
+            <div id="deadPlayersList"></div>
+        </div>
+
+        <!-- Админ-панель -->
+        <div id="adminPanel" class="admin-panel hidden">
+            <button onclick="startGame()">🎮 Начать игру</button>
+        </div>
+
+        <!-- Рулетка с ролью -->
+        <div id="roleSection" class="role-section hidden">
+            <div class="spinner" id="spinner">🎡 Крутим рулетку...</div>
+            <div class="role" id="role"></div>
+        </div>
+
+        <!-- Лог событий (Ночь/День) -->
+        <div id="eventSection" class="event-section hidden">
+            <div class="event-log" id="eventLog"></div>
+            <button id="nextPhaseBtn" onclick="nextPhase()">Далее</button>
+        </div>
+
+        <!-- Голосование -->
+        <div id="voteSection" class="vote-section hidden">
+            <h2>🗳️ Голосование (Кто Мафия?)</h2>
+            <div id="voteOptions"></div>
+        </div>
+    </div>
+
+    <script>
+        let players = [];
+        let deadPlayers = [];
+        let isAdmin = false;
+        let currentPlayerRole = "";
+        let gameState = "night"; // "night" или "day"
+        let mafiaPlayers = [];
+        let doctorPlayers = [];
+        let sheriffPlayer = null;
+        let healedPlayer = null;
+        let arrestedPlayer = null;
+
+        // Регистрация игрока
+        function registerPlayer() {
+            const name = document.getElementById("playerName").value.trim();
+            if (!name) return alert("Введи имя!");
+
+            if (name.toLowerCase() === "admin") {
+                isAdmin = true;
+                document.getElementById("adminPanel").classList.remove("hidden");
+                alert("Ты админ! Можешь начать игру.");
+            } else {
+                players.push({ name, alive: true });
+                updatePlayersList();
+            }
+            document.getElementById("playerName").value = "";
+        }
+
+        // Обновление списков игроков
+        function updatePlayersList() {
+            const list = document.getElementById("playersList");
+            list.innerHTML = "<h3>🎮 Игроки (" + players.filter(p => p.alive).length + "):</h3>";
+            players.forEach(player => {
+                if (player.alive) {
+                    list.innerHTML += `<div class="player">${player.name}</div>`;
+                }
+            });
+
+            const deadList = document.getElementById("deadPlayersList");
+            deadList.innerHTML = "";
+            deadPlayers.forEach(player => {
+                deadList.innerHTML += `<div class="dead-player">${player}</div>`;
+            });
+        }
+
+        // Начать игру (админ)
+        function startGame() {
+            if (players.length < 3) return alert("Нужно минимум 3 игрока!");
+            document.getElementById("registerSection").classList.add("hidden");
+            document.getElementById("adminPanel").classList.add("hidden");
+            document.getElementById("deadPlayersSection").classList.remove("hidden");
+
+            assignRoles();
+        }
+
+        // Раздать роли
+        function assignRoles() {
+            const roleSection = document.getElementById("roleSection");
+            roleSection.classList.remove("hidden");
+
+            // Определяем кол-во мафий/докторов (1 на 4 игроков)
+            const mafiaCount = Math.max(1, Math.floor(players.length / 4));
+            const doctorCount = Math.max(1, Math.floor(players.length / 5));
+            
+            // Перемешиваем игроков
+            const shuffledPlayers = [...players].sort(() => Math.random() - 0.5);
+
+            // Назначаем роли
+            mafiaPlayers = shuffledPlayers.slice(0, mafiaCount).map(p => p.name);
+            doctorPlayers = shuffledPlayers.slice(mafiaCount, mafiaCount + doctorCount).map(p => p.name);
+            if (players.length >= 5) {
+                sheriffPlayer = shuffledPlayers[mafiaCount + doctorCount]?.name || null;
+            }
+
+            // Крутим рулетку для текущего игрока (для демо)
+            const spinner = document.getElementById("spinner");
+            const roleDisplay = document.getElementById("role");
+            let spinInterval = setInterval(() => {
+                const randomRole = getRandomRoleForDemo();
+                roleDisplay.textContent = `Ты ${randomRole}!`;
+            }, 100);
+
+            setTimeout(() => {
+                clearInterval(spinInterval);
+                const randomRole = getRandomRoleForDemo();
+                roleDisplay.textContent = `Ты ${randomRole}!`;
+                spinner.textContent = "🎉 Роль определена!";
+                
+                setTimeout(() => {
+                    roleSection.classList.add("hidden");
+                    startNightPhase();
+                }, 3000);
+            }, 3000);
+        }
+
+        // Для демо: случайная роль текущему игроку
+        function getRandomRoleForDemo() {
+            const roles = [];
+            if (mafiaPlayers.length > 0) roles.push("👤 Мафия");
+            if (doctorPlayers.length > 0) roles.push("💊 Доктор");
+            if (sheriffPlayer) roles.push("🕵️ Шериф");
+            roles.push(...Array(3).fill("👨🌾 Мирный житель"));
+            return roles[Math.floor(Math.random() * roles.length)];
+        }
+
+        // Ночная фаза
+        function startNightPhase() {
+            gameState = "night";
+            const eventLog = document.getElementById("eventLog");
+            eventLog.innerHTML = "<h3>🌙 Ночь...</h3>";
+            
+            // Мафия выбирает жертву (для демо — случайную)
+            const alivePlayers = players.filter(p => p.alive).map(p => p.name);
+            const mafiaVictim = alivePlayers[Math.floor(Math.random() * alivePlayers.length)];
+            
+            // Доктор лечит (или нет)
+            healedPlayer = Math.random() > 0.5 ? alivePlayers[Math.floor(Math.random() * alivePlayers.length)] : null;
+            
+            // Шериф арестовывает (если есть)
+            arrestedPlayer = sheriffPlayer && Math.random() > 0.7 ? 
+                alivePlayers[Math.floor(Math.random() * alivePlayers.length)] : null;
+
+            // Формируем события
+            setTimeout(() => {
+                eventLog.innerHTML += `
+                    <div class="night-event">👤 Мафия решила убить <b>${mafiaVictim}</b>...</div>
+                    ${healedPlayer ? 
+                        `<div class="night-event">💊 Доктор вылечил <b>${healedPlayer}</b>!</div>` : ""}
+                    ${arrestedPlayer ? 
+                        `<div class="night-event">🕵️ Шериф арестовал <b>${arrestedPlayer}</b>!</div>` : ""}
+                `;
+                
+                document.getElementById("eventSection").classList.remove("hidden");
+                document.getElementById("nextPhaseBtn").textContent = "☀️ Перейти к дню";
+            }, 1500);
+        }
+
+        // Дневная фаза
+        function startDayPhase() {
+            gameState = "day";
+            const eventLog = document.getElementById("eventLog");
+            eventLog.innerHTML = "<h3>☀️ Утро...</h3>";
+            
+            // Определяем, кто умер (если не был вылечен)
+            const alivePlayers = players.filter(p => p.alive);
+            const lastNightVictim = "Игрок X"; // Здесь должна быть логика из ночи
+            
+            setTimeout(() => {
+                eventLog.innerHTML += `
+                    <div class="day-event">💀 Сегодня погиб <b>${lastNightVictim}</b>!</div>
+                    <div class="day-event">🔍 Город ищет мафию...</div>
+                `;
+                
+                document.getElementById("nextPhaseBtn").textContent = "🗳️ Начать голосование";
+            }, 1500);
+        }
+
+        // Голосование
+        function startVoting() {
+            document.getElementById("eventSection").classList.add("hidden");
+            const voteSection = document.getElementById("voteSection");
+            voteSection.classList.remove("hidden");
+
+            const voteOptions = document.getElementById("voteOptions");
+            voteOptions.innerHTML = "";
+            players.forEach(player => {
+                if (player.alive) {
+                    voteOptions.innerHTML += `<button onclick="voteFor('${player.name}')">🔘 ${player.name}</button>`;
+                }
+            });
+        }
+
+        // Переход к следующей фазе
+        function nextPhase() {
+            if (gameState === "night") {
+                startDayPhase();
+            } else if (gameState === "day") {
+                startVoting();
+            }
+        }
+
+        // Голосовать за игрока
+        function voteFor(player) {
+            alert(`Ты проголосовал за ${player}!`);
+            // Здесь можно добавить логику подсчета голосов
+        }
+    </script>
+</body>
+</html>
